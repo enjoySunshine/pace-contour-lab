@@ -1,11 +1,44 @@
 import Glyph from './Glyph';
 import Path from './Path';
+import CFFBBoxDecoder from './CFFBBoxDecoder';
 
 /**
  * Represents an OpenType PostScript glyph, in the Compact Font Format.
  */
 export default class CFFGlyph extends Glyph {
   type = 'CFF';
+
+  _getBBox() {
+    let font = this._font;
+    let decoder = font._cffBBoxDecoder;
+    if (decoder === undefined) {
+      try {
+        decoder = new CFFBBoxDecoder(font);
+      } catch (e) {
+        decoder = null;
+      }
+
+      Object.defineProperty(font, '_cffBBoxDecoder', {
+        value: decoder,
+        writable: true,
+        configurable: true,
+      });
+    }
+
+    if (decoder === null) {
+      return this.path.bbox;
+    }
+
+    try {
+      // Decode the charstring straight into a bounding box, without
+      // building the path. Bit-identical to `this.path.bbox`.
+      return decoder.decode(this.id);
+    } catch (e) {
+      // Fall back to decoding the full path for charstrings the fast
+      // decoder can't handle.
+      return this.path.bbox;
+    }
+  }
 
   _getName() {
     if (this._font.CFF2) {
